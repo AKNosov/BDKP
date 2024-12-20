@@ -1,0 +1,52 @@
+CREATE TABLE Soldier (
+    SoldierID SERIAL PRIMARY KEY,
+    FIO VARCHAR(100) NOT NULL UNIQUE,
+    PasswordHash VARCHAR(255) NOT NULL,
+    SquadID INT NOT NULL,
+    Rank INT NOT NULL,
+    BirthDate DATE NOT NULL
+);
+
+CREATE TABLE Squad (
+    SquadID INT NOT NULL,
+    SquadComanderID INT NOT NULL 
+
+);
+
+CREATE TABLE Supply (
+    SupplyID SERIAL PRIMARY KEY,
+    TypeID INT NOT NULL,
+    SupName VARCHAR(100) NOT NULL,
+    SupDescription TEXT,
+    StockQuantity INT NOT NULL,
+    SupWeight INT NOT NULL
+);
+
+CREATE TABLE Types (
+    TypeID SERIAL PRIMARY KEY,
+    TypeName VARCHAR(100) NOT NULL
+);
+
+CREATE TABLE ReqDet (
+    ReqDetID SERIAL PRIMARY KEY,
+    SupplyID INT NOT NULL,
+    ReqID INT NOT NULL,
+    Amount NUMERIC(10, 2) NOT NULL
+);
+
+CREATE TABLE Request (
+    ReqID SERIAL PRIMARY KEY,
+    SoldierID INT NOT NULL,
+    ReqDate TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    ReqStatus VARCHAR(50) DEFAULT 'Processing',
+    TotalWeight INT NOT NULL
+);
+
+CREATE TABLE Reserve (
+    ResID SERIAL PRIMARY KEY,
+    SoldierID INT NOT NULL,
+    SupplyID INT NOT NULL,
+    Amount INT NOT NULL
+);
+
+
