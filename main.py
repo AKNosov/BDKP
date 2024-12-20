@@ -12,7 +12,6 @@ DB_CONFIG = {
     "port": "5432",
 }
 
-
 def get_db_connection():
     try:
             return psycopg2.connect(
