@@ -48,7 +48,8 @@ CREATE TABLE Reserve (
     Amount INT NOT NULL
 );
 
-
+CREATE UNIQUE INDEX reserve_soldierid_supplyid_unique 
+ON reserve (soldierid, supplyid);
 
 
 
@@ -64,8 +65,6 @@ JOIN
 
 
 
-
-
 CREATE VIEW ResSupplyView AS
 SELECT 
     r.ResID,
@@ -78,35 +77,20 @@ JOIN
 
 
 
-CREATE OR REPLACE FUNCTION check_stock(nreqid INT) RETURNS VOID AS $$
+CREATE OR REPLACE FUNCTION check_stock() RETURNS TRIGGER AS $$
+DECLARE
+    rec RECORD;
 BEGIN
-IF ((SELECT stockquantity FROM supply WHERE supplyid = (SELECT supplyid FROM ReqDet WHERE ReqId = nreqid)) < (SELECT amount FROM ReqDet WHERE reqid = nreqid))
-THEN RAISE EXCEPTION 'Недостаточное количество припаса на складе';
-END IF;
+    FOR rec IN
+        SELECT supplyid, amount FROM ReqDet WHERE ReqId = NEW.reqid
+    LOOP
+        IF ((SELECT stockquantity FROM supply WHERE supplyid = rec.supplyid) < rec.amount) 
+        THEN RAISE EXCEPTION 'Недостаточно припасов!';
+        END IF;
+    END LOOP;
+RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
-
-
-CREATE OR REPLACE PROCEDURE ReqApply()
-LANGUAGE plpgsql AS $$
-DECLARE rec RECORD;
-BEGIN
-    EXECUTE check_stock(NEW. reqid);
-    FOR rec IN
-        SELECT supplyid, amount FROM reqdet WHERE reqid = NEW. reqid
-    LOOP
-        UPDATE supply
-        SET stockquantity = stockquantity - rec.amount
-        WHERE supplyid = rec.supplyid;
-        UPDATE reserve
-        SET amount = amount + rec.amount
-        WHERE soldierid = (SELECT soldierid FROM request WHERE reqid = NEW. reqid)
-          AND supplyid = rec.supplyid;
-    END LOOP;
-END;
-$$;
-
-
 
 
 
@@ -114,8 +98,33 @@ CREATE OR REPLACE TRIGGER change_stock
 BEFORE UPDATE ON Request
 FOR EACH ROW
 WHEN (NEW. reqstatus = 'Одобрен')
-EXECUTE PROCEDURE ReqApply();
+EXECUTE FUNCTION check_stock();
 
 
 
 
+CREATE OR REPLACE PROCEDURE ReqApply(nreq INT)
+LANGUAGE plpgsql AS $$
+DECLARE
+    rec RECORD;
+    soldier_id INT;
+BEGIN
+    SELECT soldierid INTO soldier_id
+    FROM request
+    WHERE reqid = nreq;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Запись с reqid = % не найдена', nreq;
+    END IF;
+    FOR rec IN
+        SELECT supplyid, amount FROM reqdet WHERE reqid = nreq
+    LOOP
+        UPDATE supply
+        SET stockquantity = stockquantity - rec.amount
+        WHERE supplyid = rec.supplyid;
+        INSERT INTO reserve (soldierid, supplyid, amount)
+        VALUES (soldier_id, rec.supplyid, rec.amount)
+        ON CONFLICT (soldierid, supplyid) DO UPDATE
+        SET amount = reserve.amount + EXCLUDED.amount;
+    END LOOP;
+END;
+$$;
