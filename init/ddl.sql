@@ -8,9 +8,8 @@ CREATE TABLE Soldier (
 );
 
 CREATE TABLE Squad (
-    SquadID INT NOT NULL,
+    SquadID SERIAL PRIMARY KEY,
     SquadComanderID INT NOT NULL 
-
 );
 
 CREATE TABLE Supply (
@@ -48,5 +47,75 @@ CREATE TABLE Reserve (
     SupplyID INT NOT NULL,
     Amount INT NOT NULL
 );
+
+
+
+
+
+CREATE VIEW ReqDetSupplyView AS
+SELECT 
+    r.ReqID,
+    s.SupName,
+    r.Amount
+FROM 
+    ReqDet r
+JOIN 
+    Supply s ON r.SupplyID = s.SupplyID;
+
+
+
+
+
+CREATE VIEW ResSupplyView AS
+SELECT 
+    r.ResID,
+    s.SupName,
+    r.Amount
+FROM 
+    Reserve r
+JOIN 
+    Supply s ON r.SupplyID = s.SupplyID;
+
+
+
+CREATE OR REPLACE FUNCTION check_stock(nreqid INT) RETURNS VOID AS $$
+BEGIN
+IF ((SELECT stockquantity FROM supply WHERE supplyid = (SELECT supplyid FROM ReqDet WHERE ReqId = nreqid)) < (SELECT amount FROM ReqDet WHERE reqid = nreqid))
+THEN RAISE EXCEPTION 'Недостаточное количество припаса на складе';
+END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+
+CREATE OR REPLACE PROCEDURE ReqApply()
+LANGUAGE plpgsql AS $$
+DECLARE rec RECORD;
+BEGIN
+    EXECUTE check_stock(NEW. reqid);
+    FOR rec IN
+        SELECT supplyid, amount FROM reqdet WHERE reqid = NEW. reqid
+    LOOP
+        UPDATE supply
+        SET stockquantity = stockquantity - rec.amount
+        WHERE supplyid = rec.supplyid;
+        UPDATE reserve
+        SET amount = amount + rec.amount
+        WHERE soldierid = (SELECT soldierid FROM request WHERE reqid = NEW. reqid)
+          AND supplyid = rec.supplyid;
+    END LOOP;
+END;
+$$;
+
+
+
+
+
+CREATE OR REPLACE TRIGGER change_stock
+BEFORE UPDATE ON Request
+FOR EACH ROW
+WHEN (NEW. reqstatus = 'Одобрен')
+EXECUTE PROCEDURE ReqApply();
+
+
 
 

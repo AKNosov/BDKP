@@ -9,14 +9,14 @@ services:
       POSTGRES_USER: postgre
       POSTGRES_PASSWORD: postgre
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
-      - ./init:/docker-entrypoint-initdb.d.sql
+      - ./init:/docker-entrypoint-initdb.d
 
   app:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: dockerfile
     container_name: kpbdapp
     environment:
       - POSTGRES_DB=postgre
